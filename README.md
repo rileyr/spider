@@ -19,3 +19,10 @@ setup. With spider installed, my tree looks like:
                 ├── README.md
                 └── spider.go
 ```
+
+#### usage
+  Run spider, providing the url of the site to be crawled:
+
+```bash
+spider -url=mycoolsite.com
+```
