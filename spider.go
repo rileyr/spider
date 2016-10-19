@@ -50,7 +50,9 @@ func getLinks(url string, uChan chan string, dChan chan bool) {
 			if isAnchor {
 				for _, attr := range t.Attr {
 					if attr.Key == "href" {
-						uChan <- attr.Val
+						if attr.Val != "#" && attr.Val != "javascript:void(0)" {
+							uChan <- attr.Val
+						}
 					}
 				}
 			}
@@ -79,13 +81,21 @@ func main() {
 
 	// get the links from the input page:
 	go getLinks(url, urlChan, doneChan)
+
+	max := 100
 	doneCount := 0
-	for doneCount < 1 {
+	started := 1
+	for doneCount < started {
 		select {
 		case <-doneChan:
 			doneCount++
 		case link := <-urlChan:
+			fmt.Printf(": %s\n", link)
 			foundUrls = append(foundUrls, link)
+			if started < max {
+				started++
+				go getLinks(link, urlChan, doneChan)
+			}
 		default:
 			continue
 		}
@@ -93,8 +103,5 @@ func main() {
 
 	if len(foundUrls) > 0 {
 		fmt.Printf("Found %d links!\n", len(foundUrls))
-		for i, l := range foundUrls {
-			fmt.Printf("%d: %s\n", i, l)
-		}
 	}
 }
