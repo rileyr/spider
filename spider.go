@@ -9,15 +9,25 @@ import (
 	"os"
 )
 
-func getInput() (string, error) {
+func getInput() (string, int, error) {
 	url := flag.String("url", "", "the url of the site to be crawled")
+	max := flag.Int("max", 1, "max number of requests to make")
 
 	flag.Parse()
 
 	if *url == "" {
-		return "", errors.New("Missing URL to crawl.")
+		return "", 0, errors.New("Missing URL to crawl.")
 	}
-	return *url, nil
+	return *url, *max, nil
+}
+
+func stringInCollection(c []string, s string) bool {
+	for _, e := range c {
+		if s == e {
+			return true
+		}
+	}
+	return false
 }
 
 func getLinks(url string, uChan chan string, dChan chan bool) {
@@ -31,18 +41,18 @@ func getLinks(url string, uChan chan string, dChan chan bool) {
 		return
 	}
 	fmt.Printf("URL retrieved: %s\n", url)
-	uChan <- url
 
 	body := resp.Body
 	defer body.Close()
 	parser := html.NewTokenizer(body)
+
+	skips := []string{"", "#", "/", "javascript:void(0)"}
 
 	for {
 		token := parser.Next()
 
 		switch {
 		case token == html.ErrorToken:
-			// EOF
 			return
 		case token == html.StartTagToken:
 			t := parser.Token()
@@ -50,7 +60,7 @@ func getLinks(url string, uChan chan string, dChan chan bool) {
 			if isAnchor {
 				for _, attr := range t.Attr {
 					if attr.Key == "href" {
-						if attr.Val != "#" && attr.Val != "javascript:void(0)" {
+						if url != attr.Val && !stringInCollection(skips, attr.Val) {
 							uChan <- attr.Val
 						}
 					}
@@ -61,8 +71,7 @@ func getLinks(url string, uChan chan string, dChan chan bool) {
 }
 
 func main() {
-	// Get the URL to start crawling:
-	url, err := getInput()
+	url, max, err := getInput()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -70,19 +79,14 @@ func main() {
 		fmt.Printf("URL to crawl is: %s\n", url)
 	}
 
-	// collection of urls found on the page:
 	foundUrls := make([]string, 0, 50)
 
-	// channel to send urls down:
 	urlChan := make(chan string)
 
-	// channel to indicate that we've finished with a page:
 	doneChan := make(chan bool)
 
-	// get the links from the input page:
 	go getLinks(url, urlChan, doneChan)
 
-	max := 100
 	doneCount := 0
 	started := 1
 	for doneCount < started {
