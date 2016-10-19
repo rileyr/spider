@@ -4,9 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"golang.org/x/net/html"
 	"net/http"
 	"os"
-	//	"golang.org/x/net/html"
 )
 
 func getInput() (string, error) {
@@ -25,13 +25,37 @@ func getLinks(url string, uChan chan string, dChan chan bool) {
 		dChan <- true
 	}()
 
-	_, err := http.Get(url)
+	resp, err := http.Get(url)
 	if err != nil {
 		fmt.Printf("Error getting %s; aborting!\n", url)
 		return
 	}
 	fmt.Printf("URL retrieved: %s\n", url)
 	uChan <- url
+
+	body := resp.Body
+	defer body.Close()
+	parser := html.NewTokenizer(body)
+
+	for {
+		token := parser.Next()
+
+		switch {
+		case token == html.ErrorToken:
+			// EOF
+			return
+		case token == html.StartTagToken:
+			t := parser.Token()
+			isAnchor := t.Data == "a"
+			if isAnchor {
+				for _, attr := range t.Attr {
+					if attr.Key == "href" {
+						uChan <- attr.Val
+					}
+				}
+			}
+		}
+	}
 }
 
 func main() {
@@ -69,5 +93,8 @@ func main() {
 
 	if len(foundUrls) > 0 {
 		fmt.Printf("Found %d links!\n", len(foundUrls))
+		for i, l := range foundUrls {
+			fmt.Printf("%d: %s\n", i, l)
+		}
 	}
 }
