@@ -1,25 +1,11 @@
 package main
 
 import (
-	"errors"
-	"flag"
 	"fmt"
 	"golang.org/x/net/html"
 	"net/http"
 	"os"
 )
-
-func getInput() (string, int, error) {
-	url := flag.String("url", "", "the url of the site to be crawled")
-	max := flag.Int("max", 1, "max number of requests to make")
-
-	flag.Parse()
-
-	if *url == "" {
-		return "", 0, errors.New("Missing URL to crawl.")
-	}
-	return *url, *max, nil
-}
 
 func stringInCollection(c []string, s string) bool {
 	for _, e := range c {
@@ -71,12 +57,13 @@ func getLinks(url string, uChan chan string, dChan chan bool) {
 }
 
 func main() {
-	url, max, err := getInput()
-	if err != nil {
-		fmt.Println(err)
+	inp := new(input)
+	inp.Parse()
+	if !inp.Success() {
+		fmt.Println("fail")
 		os.Exit(1)
 	} else {
-		fmt.Printf("URL to crawl is: %s\n", url)
+		fmt.Printf("URL to crawl is: %s\n", inp.Url)
 	}
 
 	foundUrls := make([]string, 0, 50)
@@ -85,7 +72,7 @@ func main() {
 
 	doneChan := make(chan bool)
 
-	go getLinks(url, urlChan, doneChan)
+	go getLinks(inp.Url, urlChan, doneChan)
 
 	doneCount := 0
 	started := 1
@@ -96,7 +83,7 @@ func main() {
 		case link := <-urlChan:
 			fmt.Printf(": %s\n", link)
 			foundUrls = append(foundUrls, link)
-			if started < max {
+			if started < inp.Max {
 				started++
 				go getLinks(link, urlChan, doneChan)
 			}
